@@ -174,13 +174,13 @@ result = someFunction(arg1, ...
 %@ Optional instructor section
 debugVar = true;
 tempData = load('instructor_data.mat');
-% More code that students see
+%% More code that students see
 ```
 
 **Worksheet Output:**
 ```matlab
 % Regular code that students see
-% More code that students see
+%% More code that students see
 ```
 
 **Key Output:**
@@ -189,7 +189,7 @@ tempData = load('instructor_data.mat');
 % Optional instructor section
 debugVar = true;
 tempData = load('instructor_data.mat');
-% More code that students see
+%% More code that students see
 ```
 
 #### Example 5: Get Version Information
@@ -273,7 +273,7 @@ The `%/#` end tag removes the entire line regardless of additional content:
 
 ```matlab
 %# This comment will be preserved
-%# But this line with extra content will be removed entirely
+% But this line with extra content will be removed entirely
 some_code_to_hide();
 %/# This entire line is removed
 ```
@@ -324,21 +324,36 @@ tempData = load('instructor_data.mat');
 % More code that students will see
 ```
 
-### Multiline Comment Blocks
+### Multiline Comment Blocks as Regular Text Blocks
 
-You can also create multiline comment blocks with consecutive comment lines:
+You can use multiline comment blocks (`%# ... %/#`) to include blocks of regular text or instructions in the final worksheet:
 
 ```matlab
-%# Use this section to set up variables
-%# Here is another comment line
-%# And these should continue until we reach
-%# the termination.
-% some code
-% we want to strip
-% so the student doesn't see it in the assignment
-% but the key sees it.
-%/# 
+%# This entire block appears as regular comment text in the worksheet.
+%# You can write step-by-step instructions, explanations,
+%# or definitions for students.
+% 
+% For example, you can describe an algorithm:
+%
+% # Load the dataset
+% # Preprocess the data
+% # Plot the results and analyze
+%
+%%
+% Or, provide assignment instructions:
+%
+% * Complete all steps below
+% * Submit your solutions on Canvas
+%
+%%
+% All the lines between %# and %/# will be converted to regular comment lines
+% in the worksheet, so students see the formatted text, but do not see
+% any special instructor code or setup.
+%/#
 ```
+
+In the final worksheet, this will appear simply as a block of `%` comments for the student, making it easy to provide readable narrative or formatted instructions.
+
 
 ### Processing Flow
 
