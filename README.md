@@ -329,6 +329,7 @@ tempData = load('instructor_data.mat');
 You can use multiline comment blocks (`%# ... %/#`) to include blocks of regular text or instructions in the final worksheet:
 
 ```matlab
+%%
 %# This entire block appears as regular comment text in the worksheet.
 %# You can write step-by-step instructions, explanations,
 %# or definitions for students.
@@ -429,4 +430,4 @@ This project is licensed under the MIT License - see the LICENSE file for more d
 
 ## Versioning
 
-This version (v0.2.0) was written on MATLAB 2022b and tested on 2025a.
+This version (v0.2.0) was written on MATLAB 2022b and tested on 2025b.
