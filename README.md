@@ -29,7 +29,7 @@ addpath('path_to_LiveAssignmentBuilder');
 To run the example from the root directory:
 
 ```matlab
-LiveAssignmentBuilder("example.m", struct('root', fullfile(cd, "examples"), 'output', fullfile(cd, "examples", "target")));
+LiveAssignmentBuilder("example.m", root=fullfile(cd, "examples"), output=fullfile(cd, "examples", "target"));
 ```
 
 This will process the `example.m` file in the `examples` directory and generate the output files in `examples/target`.
@@ -56,6 +56,9 @@ obj = LiveAssignmentBuilder(inputFile, opts)
 - `package` (logical, default: `false`): If true, packages the generated outputs into a ZIP file.
 - `buildContents` (logical, default: `false`): If true, generates a CONTENTS live script with links to all generated live scripts.
 - `executeKey` (logical, default: `false`): If true, executes the generated key files to verify their functionality.
+- `answerBlockMode` (string, default: `"default"`): Controls how answer blocks (`%@`) are processed:
+  - `"default"`: Replaces `%@` with `"% ANSWER HERE"` on the line containing `%@`, then marks the next full statement for removal. If the next line uses `...` (line continuation), it continues until the last line with `...` and then marks one additional line, capturing complete multi-line statements.
+  - `"expand"`: The line containing `%@` and all subsequent lines until `%/@`, `%!`, or `%%` (two or more consecutive `%` symbols) are marked for removal.
 
 ### Static Methods
 
@@ -79,7 +82,7 @@ obj = LiveAssignmentBuilder("file1.m", "file2.m");
 Process the example file with verbose output:
 
 ```matlab
-obj = LiveAssignmentBuilder("example.m", struct('root', fullfile(cd, "examples"), 'output', fullfile(cd, "examples", "target"), 'verbose', true));
+obj = LiveAssignmentBuilder("example.m", root=fullfile(cd, "examples"), output=fullfile(cd, "examples", "target"), verbose=true);
 ```
 
 #### Example 3: Build with Table of Contents
@@ -87,7 +90,7 @@ obj = LiveAssignmentBuilder("example.m", struct('root', fullfile(cd, "examples")
 Build live scripts and generate a table of contents:
 
 ```matlab
-obj = LiveAssignmentBuilder("none", struct('buildContents', true, 'verbose', true));
+obj = LiveAssignmentBuilder("none", buildContents=true, verbose=true);
 ```
 
 #### Example 4: Package the Build
@@ -95,7 +98,98 @@ obj = LiveAssignmentBuilder("none", struct('buildContents', true, 'verbose', tru
 Generate live scripts and package them with additional libraries:
 
 ```matlab
-obj = LiveAssignmentBuilder("task1.m", struct('output', './output_directory', 'libs', './path/to/libs', 'package', true));
+obj = LiveAssignmentBuilder("task1.m", output='./output_directory', libs='./path/to/libs', package=true);
+```
+
+#### Example 7: Using Answer Block Modes
+
+Use default mode (only mark the line with `%@` for removal):
+
+```matlab
+obj = LiveAssignmentBuilder("example.m", answerBlockMode='default');
+```
+
+Use expand mode (remove `%@` line and all subsequent lines until stop marker):
+
+```matlab
+obj = LiveAssignmentBuilder("example.m", answerBlockMode='expand');
+```
+
+**Answer Block Example (Default Mode):**
+
+```matlab
+% Regular code that students see
+%@ Optional instructor code
+debugVar = true;
+% More code that students see
+```
+
+**Worksheet Output:**
+```matlab
+% Regular code that students see
+% ANSWER HERE
+% More code that students see
+```
+
+**Key Output:**
+```matlab
+% Regular code that students see
+% Optional instructor code
+debugVar = true;
+% More code that students see
+```
+
+**Answer Block Example (Default Mode with Line Continuation):**
+
+```matlab
+% Regular code that students see
+%@ Complex calculation
+result = someFunction(arg1, ...
+    arg2, ...
+    arg3);
+% More code that students see
+```
+
+**Worksheet Output:**
+```matlab
+% Regular code that students see
+% ANSWER HERE
+% More code that students see
+```
+
+**Key Output:**
+```matlab
+% Regular code that students see
+% Complex calculation
+result = someFunction(arg1, ...
+    arg2, ...
+    arg3);
+% More code that students see
+```
+
+**Answer Block Example (Expand Mode):**
+
+```matlab
+% Regular code that students see
+%@ Optional instructor section
+debugVar = true;
+tempData = load('instructor_data.mat');
+% More code that students see
+```
+
+**Worksheet Output:**
+```matlab
+% Regular code that students see
+% More code that students see
+```
+
+**Key Output:**
+```matlab
+% Regular code that students see
+% Optional instructor section
+debugVar = true;
+tempData = load('instructor_data.mat');
+% More code that students see
 ```
 
 #### Example 5: Get Version Information
@@ -132,7 +226,11 @@ The parser uses a modular approach with specialized methods for each block type:
 The parser recognizes the following block types:
 
 - **Sticky Blocks** (`%!`): Sections marked as non-editable for students. Use `%! comment` to provide custom comments.
-- **Answer Blocks** (`%@`): Instructor-only content that is hidden in the student version.
+- **Answer Blocks** (`%@`): Instructor-only content that is hidden in the student version. Behavior controlled by `answerBlockMode` option:
+  - **Default mode** (`"default"`): Replaces `%@` with `"% ANSWER HERE"` on the line containing `%@`, then marks the next full statement for removal. Handles multi-line statements with `...` (line continuation) by continuing until the last `...` line plus one more line.
+  - **Expand mode** (`"expand"`): The line with `%@` and all subsequent lines until `%/@`, `%!`, or `%%` are removed from worksheets.
+  
+  **Note**: Answer blocks in comment lines are ignored. If the first non-whitespace character before `%@` is `%` (e.g., `% %@ comment`), the block is left unchanged.
 - **Multiline Answer Blocks** (`%|@ ... %||@`): Sections where students are expected to provide answers. Respects indentation.
 - **Inline Answer Blocks** (`%<@ ... %>@`): Inline expressions for student answers or hidden solutions. Respects indentation.
 - **Comment Blocks** (`%# ... %/#`): Strips content from worksheets but preserves comment text. In keys, converts to regular comments. Respects indentation.
@@ -316,4 +414,4 @@ This project is licensed under the MIT License - see the LICENSE file for more d
 
 ## Versioning
 
-This version (v0.1.0) was written on MATLAB 2022b and tested on 2025a.
+This version (v0.2.0) was written on MATLAB 2022b and tested on 2025a.

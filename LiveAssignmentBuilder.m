@@ -33,6 +33,20 @@ classdef LiveAssignmentBuilder
 %       'executeKey' (default: false): If true, executes the generated key files to verify
 %                                      their functionality.
 %
+%       'answerBlockMode' (default: "default") : Controls how answer blocks (%@) are processed.
+%                                                Options:
+%                                                - "default": Replaces %@ with "% ANSWER HERE"
+%                                                  on the line containing %@, then marks the
+%                                                  next full statement for removal. If the next
+%                                                  line uses ... (line continuation), it continues
+%                                                  until the last line with ... and then marks
+%                                                  one additional line, capturing complete
+%                                                  multi-line statements.
+%                                                - "expand": The line containing %@ and all
+%                                                  subsequent lines until %/@, %!, or %%
+%                                                  (two or more consecutive % symbols) are
+%                                                  marked for removal.
+%
 %   Example:
 %   --------
 %   % Convert specific .m files into live scripts with default settings:
@@ -40,7 +54,7 @@ classdef LiveAssignmentBuilder
 %
 %   % Convert .m files and specify output directory with verbosity:
 %   LiveAssignmentBuilder("file1.m", "file2.m", ...
-%       struct('output', 'output_directory', 'verbose', true));
+%       output='output_directory', verbose=true);
 %
 %   % Automatically find and convert all .m files in the current directory:
 %   LiveAssignmentBuilder("none");
@@ -53,6 +67,7 @@ classdef LiveAssignmentBuilder
 %   The custom parsing syntax includes:
 %   - Sticky Blocks (%!): Mark sections as non-editable for students.
 %   - Answer Blocks (%@): Instructor-only content hidden in the student version.
+%     Behavior controlled by 'answerBlockMode' option (see above).
 %   - Multiline Answer Blocks (%|@ ... %||@): Sections for student answers.
 %   - Inline Answer Blocks (%<@ ... %>@): Inline expressions for student answers
 %     or hidden solutions.
@@ -61,15 +76,15 @@ classdef LiveAssignmentBuilder
 %%%
 %   See also: matlab.internal.liveeditor.openAndSave, dir, mkdir, copyfile.
 %
-%   Version: 0.1.0
+%   Version: 0.2.0
 %   Author: Khris Griffis, Ph.D.
-%   Year: 2024
+%   Year: 2026
 %   License: MIT
 %%%
 
   properties (Constant)
     % Version information
-    Version = "0.1.0"
+    Version = "0.2.0"
     Author = "Khris Griffis, Ph.D."
     Year = 2024
     License = "MIT"
@@ -84,6 +99,7 @@ classdef LiveAssignmentBuilder
     package (1,1) logical
     buildContents (1,1) logical
     executeKey (1,1) logical
+    answerBlockMode (1,1) string {mustBeMember(answerBlockMode, ["default", "expand"])} = "default"
     indentChar (1,:) char = " "
   end
 
@@ -133,11 +149,12 @@ classdef LiveAssignmentBuilder
       fprintf('    .verbose      - Print detailed messages (default: false)\n');
       fprintf('    .package      - Package outputs into ZIP (default: false)\n');
       fprintf('    .buildContents- Generate CONTENTS live script (default: false)\n');
-      fprintf('    .executeKey   - Execute key files (default: false)\n\n');
+      fprintf('    .executeKey   - Execute key files (default: false)\n');
+      fprintf('    .answerBlockMode - Answer block mode: "default" or "expand" (default: "default")\n\n');
       fprintf('Examples:\n');
       fprintf('  LiveAssignmentBuilder("file1.m", "file2.m")\n');
-      fprintf('  LiveAssignmentBuilder("none", struct(''verbose'', true))\n');
-      fprintf('  LiveAssignmentBuilder("task.m", struct(''output'', ''./out'', ''package'', true))\n\n');
+      fprintf('  LiveAssignmentBuilder("none", verbose=true)\n');
+      fprintf('  LiveAssignmentBuilder("task.m", output=''./out'', package=true)\n\n');
     end
 
     function examples()
@@ -154,7 +171,7 @@ classdef LiveAssignmentBuilder
       fprintf('   LiveAssignmentBuilder("file1.m", "file2.m")\n\n');
       
       fprintf('2. With Options:\n');
-      fprintf('   LiveAssignmentBuilder("task.m", struct(''verbose'', true, ''package'', true))\n\n');
+      fprintf('   LiveAssignmentBuilder("task.m", verbose=true, package=true)\n\n');
       
       fprintf('3. Parse All Files in Directory:\n');
       fprintf('   LiveAssignmentBuilder("none")\n\n');
@@ -162,6 +179,8 @@ classdef LiveAssignmentBuilder
       fprintf('Custom Parsing Syntax:\n');
       fprintf('  %% Sticky Blocks (%%!): Non-editable sections\n');
       fprintf('  %% Answer Blocks (%%@): Instructor-only content\n');
+      fprintf('    - Default mode: Replaces %%@ with "%% ANSWER HERE", removes next statement\n');
+      fprintf('    - Expand mode: %%@ line and all subsequent lines until stop marker\n');
       fprintf('  %% Multiline Answer Blocks (%%|@ ... %%||@): Student answer areas\n');
       fprintf('  %% Inline Answer Blocks (%%<@ ... %%>@): Inline expressions\n');
       fprintf('  %% Comment Blocks (%%# ... %%/#): Strip content, preserve comments\n\n');
@@ -248,6 +267,19 @@ classdef LiveAssignmentBuilder
       %                                          links to all generated live scripts.
       %       'executeKey' (default: false): If true, executes the generated key files to verify
       %                                      their functionality.
+      %       'answerBlockMode' (default: "default") : Controls how answer blocks (%@) are processed.
+      %                                                Options:
+      %                                                - "default": Replaces %@ with "% ANSWER HERE"
+      %                                                  on the line containing %@, then marks the
+      %                                                  next full statement for removal. If the next
+      %                                                  line uses ... (line continuation), it continues
+      %                                                  until the last line with ... and then marks
+      %                                                  one additional line, capturing complete
+      %                                                  multi-line statements.
+      %                                                - "expand": The line containing %@ and all
+      %                                                  subsequent lines until %/@, %!, or %%
+      %                                                  (two or more consecutive % symbols) are
+      %                                                  marked for removal.
       %
       %   Example:
       %   --------
@@ -256,7 +288,7 @@ classdef LiveAssignmentBuilder
       %
       %   % Convert .m files and specify output directory with verbosity:
       %   obj = LiveAssignmentBuilder("file1.m", "file2.m", ...
-      %       struct('output', 'output_directory', 'verbose', true));
+      %       output='output_directory', verbose=true);
       %
       %   % Automatically find and convert all .m files in the current directory:
       %   obj = LiveAssignmentBuilder("none");
@@ -274,6 +306,7 @@ classdef LiveAssignmentBuilder
         opts.package (1,1) logical = false
         opts.buildContents (1,1) logical= false
         opts.executeKey (1,1) logical = false
+        opts.answerBlockMode (1,1) string {mustBeMember(opts.answerBlockMode, ["default", "expand"])} = "default"
       end
 
       import matlab.internal.liveeditor.LiveEditorUtilities;
@@ -286,6 +319,7 @@ classdef LiveAssignmentBuilder
       obj.package      = opts.package;
       obj.buildContents= opts.buildContents;
       obj.executeKey   = opts.executeKey;
+      obj.answerBlockMode = opts.answerBlockMode;
 
       % Use obj properties from here on
       if isempty(obj.root) || obj.root == ""
@@ -661,6 +695,7 @@ classdef LiveAssignmentBuilder
           throw(exc);
         end
       end
+      
       % drop answers private info from the worksheet
       parsedCode.work(cat(1,answerIndices(:),mlAnswerIndices(:),commentIndices(:))) = [];
 
@@ -799,10 +834,65 @@ classdef LiveAssignmentBuilder
       end
     end
 
+    function filteredBlockInfo = filterCommentLineBlocks(obj, stringCode, blockInfo, blockKey)
+      % FILTERCOMMENTLINEBLOCKS Filter out blocks that appear in comment lines
+      %
+      %   Removes blocks where the first non-whitespace character before the block
+      %   marker is a '%' character, indicating the block is in a comment line.
+      %
+      % Inputs:
+      %   stringCode    - Array of strings containing the code
+      %   blockInfo     - Struct array with block information (from detectBlocks)
+      %   blockKey      - The block marker (e.g., '%!', '%@', '%#', '%|@')
+      %
+      % Outputs:
+      %   filteredBlockInfo - Filtered block info struct array
+      arguments
+        obj
+        stringCode (:,1) string
+        blockInfo (:,1) struct
+        blockKey (1,1) string
+      end
+      
+      if isempty(blockInfo)
+        filteredBlockInfo = blockInfo;
+        return;
+      end
+      
+      % Filter out blocks where the line starts with a comment character
+      validBlocks = false(1, numel(blockInfo));
+      for i = 1:numel(blockInfo)
+        row = blockInfo(i).row;
+        if isnan(row)
+          continue;
+        end
+        charLine = stringCode{row};
+        % Find the position of blockKey in the line
+        keyPos = strfind(charLine, blockKey);
+        if isempty(keyPos)
+          continue; % Shouldn't happen, but skip if blockKey not found
+        end
+        % Find first non-whitespace character in the line
+        firstNonWsIdx = regexp(charLine, '\S', 'once');
+        % If the first non-whitespace character is % and it's before blockKey, this is a comment line
+        if ~isempty(firstNonWsIdx) && charLine(firstNonWsIdx) == '%' && firstNonWsIdx < keyPos(1)
+          % This is a comment line (e.g., "% %@ comment" or "  % %! comment"), ignore the block
+          continue;
+        end
+        validBlocks(i) = true;
+      end
+      % Keep only valid blocks
+      filteredBlockInfo = blockInfo(validBlocks);
+    end
+
     function stringCode = parseStickyBlocks(obj, stringCode)
       % PARSESTICKYBLOCKS Parse sticky blocks (%!)
       %
       blockInfo = obj.detectBlocks(stringCode, '%!');
+      
+      % Filter out blocks where the line starts with a comment character
+      blockInfo = obj.filterCommentLineBlocks(stringCode, blockInfo, '%!');
+      
       for i = 1:numel(blockInfo)
         row = blockInfo(i).row;
         indent = blockInfo(i).indent;
@@ -824,45 +914,123 @@ classdef LiveAssignmentBuilder
     function [answerIndices, stringCode] = parseAnswerBlocks(obj, stringCode)
       % PARSEANSWERBLOCKS Parse answer blocks (%@)
       %
+      %   Parses answer blocks marked with %@ according to the answerBlockMode setting:
+      %   - "default": Replaces %@ with "% ANSWER HERE" on the line containing %@, then
+      %     marks the next full statement for removal. If the next line uses ... (line
+      %     continuation), it continues until the last line with ... and then marks one
+      %     additional line. This captures complete statements including multi-line ones.
+      %   - "expand": Marks the line containing %@ and all subsequent lines until one of:
+      %     %/@, %!, or %% (two or more consecutive % symbols) is encountered.
+      %
+      % Inputs:
+      %   stringCode - Array of strings containing the code
+      %
       % Outputs:
       %   answerIndices - Array of line indices to remove from worksheet
+      %   stringCode    - Modified code array with answer block markers processed
       
       blockInfo = obj.detectBlocks(stringCode, '%@');
+      
+      % Filter out blocks where the line starts with a comment character
+      blockInfo = obj.filterCommentLineBlocks(stringCode, blockInfo, '%@');
+      
       % Process each answer block
       answerIndices = [];      
       for i = 1:numel(blockInfo)
         row = blockInfo(i).row;
         indent = blockInfo(i).indent;
         charLine = stringCode{row};
-        % Replace %@ with % ANSWER HERE
-        stringCode(row) = LiveAssignmentBuilder.replaceCommentLine( ...
-          charLine, ...
-          '%@', ...
-          indent, ...
-          obj.indentChar, ...
-          "ANSWER HERE" ...
-        );
-        % Find the end of this answer block
-        % We need to look for either %/@, %! or %{2,}
-        startIdx = row + 1;
-        chunk = stringCode(startIdx:end);
-        aStop = ~cellfun(@isempty,regexp(chunk,regexptranslate('escape', '%/@'),'once'),'unif',1);
-        pStop = ~cellfun(@isempty,regexp(chunk,regexptranslate('escape', '%!'),'once'),'unif',1);
-        cStop = ~cellfun(@isempty,regexp(chunk,'%{2,}','once'),'unif',1);
-        stopIdx = find(aStop | pStop | cStop, 1, 'first');
-        % skip last if note a close answer block
-        stopIdx = stopIdx + startIdx - 1 - (~aStop(stopIdx));
-        if isempty(stopIdx)
-          stopIdx = numel(stringCode);
-        end
         
-        % Add indices to remove
-        answerIndices = [answerIndices, startIdx:stopIdx]; %#ok<AGROW>
+        if obj.answerBlockMode == "default"
+          % Default mode: replace %@ with % ANSWER HERE, then mark next statement for removal
+          % Replace %@ with % ANSWER HERE in worksheet
+          stringCode(row) = LiveAssignmentBuilder.replaceCommentLine( ...
+            charLine, ...
+            '%@', ...
+            indent, ...
+            obj.indentChar, ...
+            "ANSWER HERE" ...
+          );
+          
+          % Find the next full statement to mark for removal
+          % Start from the line after %@
+          nextLineIdx = row + 1;
+          if nextLineIdx <= numel(stringCode)
+            % Check if this line or subsequent lines have ... (line continuation)
+            statementEndIdx = nextLineIdx;
+            lastContinuationIdx = -1;
+            
+            % Look for line continuations
+            for checkIdx = nextLineIdx:numel(stringCode)
+              lineStr = stringCode{checkIdx};
+              % Check if line ends with ... (line continuation)
+              % Match ... at end of line, possibly with whitespace/comments before or after
+              % Remove comments first to check for ... at end
+              commentIdx = strfind(lineStr, '%');
+              if ~isempty(commentIdx)
+                lineWithoutComment = lineStr(1:commentIdx(1)-1);
+              else
+                lineWithoutComment = lineStr;
+              end
+              % Trim and check if it ends with ...
+              lineWithoutComment = strtrim(lineWithoutComment);
+              if endsWith(lineWithoutComment, '...')
+                lastContinuationIdx = checkIdx;
+                statementEndIdx = checkIdx + 1; % One more line after last ...
+              else
+                % If we've seen a continuation and now hit a non-continuation line,
+                % we've found the end (statementEndIdx already set to lastContinuationIdx + 1)
+                if lastContinuationIdx >= 0
+                  break;
+                else
+                  % No continuation found yet, this is the statement end
+                  statementEndIdx = checkIdx;
+                  break;
+                end
+              end
+            end
+            
+            % Ensure we don't go past the end of the file
+            statementEndIdx = min(statementEndIdx, numel(stringCode));
+            
+            % Mark the statement lines for removal
+            if statementEndIdx >= nextLineIdx
+              answerIndices = [answerIndices, nextLineIdx:statementEndIdx]; %#ok<AGROW>
+            end
+          end
+        else
+          % Expand mode: mark line and all subsequent lines until stop marker
+          % Replace %@ with % ANSWER HERE
+          stringCode(row) = LiveAssignmentBuilder.replaceCommentLine( ...
+            charLine, ...
+            '%@', ...
+            indent, ...
+            obj.indentChar, ...
+            "ANSWER HERE" ...
+          );
+          % Find the end of this answer block
+          % We need to look for either %/@, %! or %{2,}
+          startIdx = row + 1;
+          chunk = stringCode(startIdx:end);
+          aStop = ~cellfun(@isempty,regexp(chunk,regexptranslate('escape', '%/@'),'once'),'unif',1);
+          pStop = ~cellfun(@isempty,regexp(chunk,regexptranslate('escape', '%!'),'once'),'unif',1);
+          cStop = ~cellfun(@isempty,regexp(chunk,'%{2,}','once'),'unif',1);
+          stopIdx = find(aStop | pStop | cStop, 1, 'first');
+          % skip last if not a close answer block
+          if ~isempty(stopIdx)
+            stopIdx = stopIdx + startIdx - 1 - (~aStop(stopIdx));
+          else
+            stopIdx = numel(stringCode);
+          end
+          
+          % Add indices to remove (subsequent lines only, row is kept with "% ANSWER HERE")
+          answerIndices = [answerIndices, startIdx:stopIdx]; %#ok<AGROW>
+        end
       end
       
       answerIndices = unique(answerIndices);
       if obj.verbose
-        fprintf("    Successfully found %d answer blocks.\n", numel(answerIndices));
+        fprintf("    Successfully found %d answer blocks (mode: %s).\n", numel(blockInfo), obj.answerBlockMode);
       end
     end
 
@@ -874,6 +1042,9 @@ classdef LiveAssignmentBuilder
       %   sourceCode        - Array of strings containing the code with in-place modifications
       
       blockInfo = obj.detectBlocks(stringCode, '%|@');
+      
+      % Filter out blocks where the line starts with a comment character
+      blockInfo = obj.filterCommentLineBlocks(stringCode, blockInfo, '%|@');
             
       mlAnswerIndices = [];
 
@@ -969,16 +1140,14 @@ classdef LiveAssignmentBuilder
       % and handle accordingly
       startInfo = obj.detectBlocks(stringCode, '%<@', false);
       endInfo = obj.detectBlocks(stringCode, '%>@', false);
+      
+      % Filter out blocks where the line starts with a comment character
+      startInfo = obj.filterCommentLineBlocks(stringCode, startInfo, '%<@');
+      endInfo = obj.filterCommentLineBlocks(stringCode, endInfo, '%>@');
+      
       endRows = [endInfo.row];
       for i = 1:numel(startInfo)
         startRow = startInfo(i).row;
-        % skip if line starts with % since we only want inline answers is code
-        % Check that the first non-whitespace character is a '%'
-        lineStr = stringCode{startRow};
-        firstNonWsIdx = regexp(lineStr, '\S', 'once');
-        if ~isempty(firstNonWsIdx) && lineStr(firstNonWsIdx) == '%'
-          continue;
-        end
         % Find the endInfo struct with the lowest row > startRow
         endIdx = find(endRows >= startRow, 1, 'first');
         if ~isempty(endIdx)
@@ -1036,6 +1205,10 @@ classdef LiveAssignmentBuilder
       % Detect all %# openers and %/# closers
       blockInfo = obj.detectBlocks(stringCode, '%#');
       endInfo = obj.detectBlocks(stringCode, '%/#');
+      
+      % Filter out blocks where the line starts with a comment character
+      blockInfo = obj.filterCommentLineBlocks(stringCode, blockInfo, '%#');
+      endInfo = obj.filterCommentLineBlocks(stringCode, endInfo, '%/#');
       startRows = [blockInfo.row];
       endRows = [endInfo.row];
       % Loop through and collect blocks, then parse for nesting

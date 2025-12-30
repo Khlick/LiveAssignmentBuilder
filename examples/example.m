@@ -5,10 +5,18 @@
 % The example shows how to:
 %
 % * Use sticky blocks to prevent editing
-% * Create answer blocks for student responses
+% * Create answer blocks for student responses (with default and expand modes)
 % * Include inline expressions for student completion
 % * Use multiline answer blocks for code completion
 % * Implement comment blocks for instructor notes
+%
+% Answer Block Modes:
+% * Default mode: Replaces %@ with "% ANSWER HERE" on the line containing %@,
+%   then marks the next full statement for removal. Handles multi-line statements
+%   with ... (line continuation) automatically.
+% * Expand mode: The %@ line and all subsequent lines until %/@, %!, or %%
+%   are removed from worksheets. Use expand mode by setting:
+%   LiveAssignmentBuilder("example.m", answerBlockMode='expand');
 %
 % _Author_: Khris Griffis, Ph.D.
 % 
@@ -75,7 +83,7 @@ end
 %% Visualization
 % Create a plot to visualize the results:
 
-%@ Optional: Visualize the new results
+%@ Optional: Visualize the new results (default mode - next statement removed)
 figure('Position', [100, 100, 800, 600]);
 plot(new_x, new_y, 'o-', 'MarkerSize', 6, 'LineWidth', 2);
 xlabel('x values');
@@ -135,6 +143,41 @@ plot(extended_x, extended_y, '-', 'LineWidth', 2);
 title('Extended Range [-2,4]');
 grid on;
 %||@
+
+%% Answer Block Modes Demonstration
+% This section demonstrates the difference between answer block modes.
+%
+% Note: To use expand mode, set answerBlockMode to "expand" when calling
+% LiveAssignmentBuilder:
+%
+%   LiveAssignmentBuilder("example.m", answerBlockMode='expand');
+%
+% Note: Answer blocks in comment lines are ignored. For example, "% %@ comment"
+% will not be processed as an answer block.
+
+%@ Default mode example: Next statement removed (handles ... continuations)
+% In default mode, %@ is replaced with "% ANSWER HERE" and the next
+% full statement is removed. This statement will be completely removed:
+result = calculateSomething(x, y, z);
+
+% %@ This is a comment line with %@ - it will be ignored and left as-is
+% This demonstrates that answer blocks in comment lines are not processed.
+
+%@ Default mode with line continuation: Multi-line statement removed
+% This multi-line statement will be completely removed:
+complexResult = processData(data1, ...
+    data2, ...
+    data3);
+
+%@ Expand mode example: This line and all following lines until %/@, %!, or %% are removed
+% This comment line will be removed in expand mode
+debugVar = true;
+tempData = load('instructor_data.mat');
+% This line will also be removed in expand mode
+%/@ End of expand mode block
+
+%% Regular section continues
+% This section appears in both worksheet and key versions.
 
 %% Summary
 % In this example, you learned how to:

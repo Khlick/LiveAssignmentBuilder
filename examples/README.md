@@ -8,7 +8,9 @@ This directory contains example files demonstrating the LiveAssignmentBuilder pa
 A comprehensive example that demonstrates all parsing syntax features:
 
 - **Sticky Blocks (`%!`)**: Protected code that students cannot edit
-- **Answer Blocks (`%@`)**: Instructor-only content hidden from students
+- **Answer Blocks (`%@`)**: Instructor-only content hidden from students. Behavior controlled by `answerBlockMode`:
+  - **Default mode** (`"default"`): Replaces `%@` with `"% ANSWER HERE"` on the line containing `%@`, then marks the next full statement for removal. Handles multi-line statements with `...` (line continuation) by continuing until the last `...` line plus one more line.
+  - **Expand mode** (`"expand"`): The line with `%@` and all subsequent lines until `%/@`, `%!`, or `%%` are removed from worksheets.
 - **Multiline Answer Blocks (`%|@ ... %||@`)**: Areas for student code completion
 - **Inline Answer Blocks (`%<@ ... %>@`)**: Single expressions for student completion
 - **Comment Blocks (`%# ... %/#`)**: Instructor notes stripped from worksheets but preserved in keys
@@ -24,44 +26,43 @@ The example shows a mathematical function evaluation task with:
 A test script that demonstrates how to use the LiveAssignmentBuilder class to convert the example.m file into live scripts.
 
 ## Usage
+To use the LiveAssignmentBuilder with the provided example files:
 
-1. **Run the test script**:
-   ```matlab
-   cd examples
-   run('test_example.m')
-   ```
+1. **Place your `.m` file(s)** (such as `example.m`) in this directory.
 
-2. **Or use LiveAssignmentBuilder directly**:
-   ```matlab
-   % Basic usage
-   LiveAssignmentBuilder('example.m');
-   
-   % With options
-   LiveAssignmentBuilder( ...
-     'example.m', ...
-     verbose=true, ...
-     output="my_output", ...
-     package=false ...
-     );
-   ```
+2. **From MATLAB**, run:
 
-3. **Check the output**:
-   - `example.mlx` - Student worksheet
-   - `example_key.mlx` - Instructor key with answers
+```matlab
+LiveAssignmentBuilder('example.m');
+```
 
-## Expected Output
+You can also customize output options (such as output folder, verbosity, packaging, answer block mode, etc.) using an options structure:
 
-The example should generate:
+```matlab
+% Use default answer block mode (only removes the line with %@)
+LiveAssignmentBuilder('example.m', verbose=true, output="output_folder");
 
-- **Student Worksheet**: Shows the task with answer placeholders, protected code blocks, and instructor comments converted to regular comments
-- **Instructor Key**: Shows complete solutions, all instructor notes, and bonus content
+% Use expand answer block mode (removes %@ line and all subsequent lines until stop marker)
+LiveAssignmentBuilder('example.m', answerBlockMode='expand', verbose=true);
+```
+
+This will generate a student worksheet (`example.mlx`) and an instructor key (`example_key.mlx`) in the specified output folder.
+
+### Answer Block Modes
+
+The `answerBlockMode` option controls how answer blocks (`%@`) are processed:
+
+- **Default mode** (`"default"`): Replaces `%@` with `"% ANSWER HERE"` on the line containing `%@`, then marks the next full statement for removal. This automatically handles single-line statements and multi-line statements with `...` (line continuation). The statement is completely removed from worksheets but remains visible in keys. This is useful when you want to hide complete instructor code statements while keeping the structure clear.
+
+- **Expand mode** (`"expand"`): The line containing `%@` and all subsequent lines until one of `%/@`, `%!`, or `%%` (two or more consecutive `%` symbols) are removed from worksheets. This is useful when you want to hide entire sections of instructor-only code.
 
 ## Parsing Syntax Reference
 
 | Syntax | Purpose | Student View | Instructor View |
 |--------|---------|--------------|-----------------|
 | `%!` | Sticky block | Protected code | Same |
-| `%@` | Answer block | Hidden | Visible |
+| `%@` | Answer block (default mode) | Next statement removed | Full statement visible |
+| `%@` ... `%/@` | Answer block (expand mode) | All lines removed | All lines visible |
 | <code>%&#124;@ ... %&#124;&#124;@</code> | Multiline answers | Answer area | Complete solution |
 | `%<@ ... %>@` | Inline answers | Placeholder | Actual answer |
 | `%# ... %/#` | Comment block | Stripped content | Regular comments |
