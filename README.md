@@ -59,6 +59,10 @@ obj = LiveAssignmentBuilder(inputFile, opts)
 - `answerBlockMode` (string, default: `"default"`): Controls how answer blocks (`%@`) are processed:
   - `"default"`: Replaces `%@` with `"% ANSWER HERE"` on the line containing `%@`, then marks the next full statement for removal. If the next line uses `...` (line continuation), it continues until the last line with `...` and then marks one additional line, capturing complete multi-line statements.
   - `"expand"`: The line containing `%@` and all subsequent lines until `%/@`, `%!`, or `%%` (two or more consecutive `%` symbols) are marked for removal.
+- `keyDisplayMode` (string, default: `"default"`): Controls how answer code is displayed in key files for all answer block types (inline, multiline, etc.):
+  - `"default"`: Only shows the answer code, no comment annotation.
+  - `"markup"`: Shows the answer code on new lines above the original assignment markup (which is commented out). For multiline blocks, shows answer code followed by commented original structure.
+  - `"marked"`: Shows the answer code followed by a comment with the same code on the same line.
 
 ### Static Methods
 
@@ -68,6 +72,8 @@ obj = LiveAssignmentBuilder(inputFile, opts)
 - `LiveAssignmentBuilder.examples()` - Display detailed usage examples
 
 ### Examples
+
+For more detailed examples, see the [examples](examples) directory.
 
 #### Example 1: Basic Usage
 
@@ -137,6 +143,77 @@ debugVar = true;
 % Optional instructor code
 debugVar = true;
 % More code that students see
+```
+
+#### Example 8: Using Key Display Modes
+
+Control how inline answer blocks are displayed in key files:
+
+```matlab
+% Default mode: Only show answer code
+obj = LiveAssignmentBuilder("example.m", keyDisplayMode='default');
+
+% Markup mode: Show answer code above commented original
+obj = LiveAssignmentBuilder("example.m", keyDisplayMode='markup');
+
+% Marked mode: Show answer code with comment annotation
+obj = LiveAssignmentBuilder("example.m", keyDisplayMode='marked');
+```
+
+**Key Display Mode Example:**
+
+For an inline block like: `result = %<@calculate(x)%>@;`
+
+**Default Mode Output:**
+```matlab
+result = calculate(x);
+```
+
+**Markup Mode Output:**
+```matlab
+calculate(x)
+% result = "%--- ANSWER HERE ---%";
+```
+
+**Marked Mode Output:**
+```matlab
+result = calculate(x);%<- calculate(x) ->%
+```
+
+**Key Display Mode for Multiline Blocks:**
+
+For a multiline block:
+```matlab
+%|@
+x = 1:10;
+y = x.^2;
+%||@
+```
+
+**Default Mode Output:**
+```matlab
+% --- Answer Start ---|
+x = 1:10;
+y = x.^2;
+% --- Answer End ---|
+```
+
+**Markup Mode Output:**
+```matlab
+% --- Answer Start ---|
+x = 1:10;
+y = x.^2;
+% x = 1:10;
+% y = x.^2;
+% --- Answer End ---|
+```
+
+**Marked Mode Output:**
+```matlab
+% --- Answer Start ---|
+x = 1:10;%<- x = 1:10; ->%
+y = x.^2;%<- y = x.^2; ->%
+% --- Answer End ---|
 ```
 
 **Answer Block Example (Default Mode with Line Continuation):**
@@ -231,8 +308,8 @@ The parser recognizes the following block types:
   - **Expand mode** (`"expand"`): The line with `%@` and all subsequent lines until `%/@`, `%!`, or `%%` are removed from worksheets.
   
   **Note**: Answer blocks in comment lines are ignored. If the first non-whitespace character before `%@` is `%` (e.g., `% %@ comment`), the block is left unchanged.
-- **Multiline Answer Blocks** (`%|@ ... %||@`): Sections where students are expected to provide answers. Respects indentation.
-- **Inline Answer Blocks** (`%<@ ... %>@`): Inline expressions for student answers or hidden solutions. Respects indentation.
+- **Multiline Answer Blocks** (`%|@ ... %||@`): Sections where students are expected to provide answers. Respects indentation. Display in key files controlled by `keyDisplayMode` option.
+- **Inline Answer Blocks** (`%<@ ... %>@`): Inline expressions for student answers or hidden solutions. Respects indentation. Display in key files controlled by `keyDisplayMode` option.
 - **Comment Blocks** (`%# ... %/#`): Strips content from worksheets but preserves comment text. In keys, converts to regular comments. Respects indentation.
 
 ### Enhanced Features
@@ -430,4 +507,4 @@ This project is licensed under the MIT License - see the LICENSE file for more d
 
 ## Versioning
 
-This version (v0.2.0) was written on MATLAB 2022b and tested on 2025b.
+This version (v0.3.0) was written on MATLAB 2022b and tested on 2025b.

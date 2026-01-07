@@ -5,6 +5,58 @@ All notable changes to the LiveAssignmentBuilder project are documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-01-XX
+
+### Added
+- **Key Display Mode option** (`keyDisplayMode`): New option to control how answer code is displayed in key files
+  - **Default mode** (`"default"`): Only shows the answer code, no comment annotation
+  - **Markup mode** (`"markup"`): Shows answer code on new lines above the original assignment markup (commented out). For multiline blocks, shows answer code followed by commented original structure
+  - **Marked mode** (`"marked"`): Shows answer code followed by a comment with the same code on the same line
+- **Consistent key display formatting**: `keyDisplayMode` now applies to all answer block types (inline and multiline blocks)
+- **Multiline answer block formatting**: Extended `keyDisplayMode` support to multiline answer blocks (`%|@ ... %||@`)
+
+### Changed
+- **Answer block default behavior**: Changed default mode to mark only the next full statement for removal (handles `...` line continuations automatically)
+- **Answer block mode option**: Added `answerBlockMode` option with "default" and "expand" modes
+  - Default mode: Marks next full statement (handles line continuations)
+  - Expand mode: Marks line and all subsequent lines until stop marker
+- **Block filtering**: All block types now ignore blocks that appear in comment lines (first non-whitespace character is `%`)
+- **Documentation syntax**: Updated all examples to use modern MATLAB name=value pair syntax instead of `struct()`
+
+### Enhanced
+- **Answer block processing**: Improved to automatically handle multi-line statements with `...` (line continuation) in default mode
+- **Block detection**: Enhanced to filter out blocks in comment lines for all block types (`%!`, `%@`, `%|@`, `%<@`, `%>@`, `%#`, `%/#`)
+- **Key file formatting**: Consistent formatting options across all answer block types
+
+### Documentation
+- **README.md**: 
+  - Added `keyDisplayMode` option documentation with examples
+  - Added `answerBlockMode` option documentation
+  - Updated examples to show all three key display modes for inline and multiline blocks
+  - Updated syntax examples to use name=value pairs
+- **examples/README.md**: 
+  - Added key display modes section
+  - Updated examples and syntax reference
+- **Class docstrings**: Updated to include new options and behaviors
+
+### Technical Details
+- Added `keyDisplayMode` property with validation
+- Added `multilineAnswerSections` property to track multiline blocks for formatting
+- Created `applyKeyDisplayModeToMultiline()` helper method
+- Enhanced `parseInlineBlocks()` to support all three key display modes
+- Enhanced `parseMultilineBlocks()` to store section information for formatting
+- Added `filterCommentLineBlocks()` helper method for consistent block filtering
+
+## [0.2.0] - 2024-12-XX
+
+### Added
+- **Answer block mode option** (`answerBlockMode`): Control how answer blocks (`%@`) are processed
+  - **Default mode** (`"default"`): Only marks the line containing `%@` for removal
+  - **Expand mode** (`"expand"`): Marks the line containing `%@` and all subsequent lines until stop marker
+
+### Changed
+- **Answer block default behavior**: Changed to only mark the line with `%@` for removal (previous behavior moved to expand mode)
+
 ## [0.1.0] - 2024-12-19
 
 ### Added

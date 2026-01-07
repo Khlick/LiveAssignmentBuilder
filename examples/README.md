@@ -11,8 +11,8 @@ A comprehensive example that demonstrates all parsing syntax features:
 - **Answer Blocks (`%@`)**: Instructor-only content hidden from students. Behavior controlled by `answerBlockMode`:
   - **Default mode** (`"default"`): Replaces `%@` with `"% ANSWER HERE"` on the line containing `%@`, then marks the next full statement for removal. Handles multi-line statements with `...` (line continuation) by continuing until the last `...` line plus one more line.
   - **Expand mode** (`"expand"`): The line with `%@` and all subsequent lines until `%/@`, `%!`, or `%%` are removed from worksheets.
-- **Multiline Answer Blocks (`%|@ ... %||@`)**: Areas for student code completion
-- **Inline Answer Blocks (`%<@ ... %>@`)**: Single expressions for student completion
+- **Multiline Answer Blocks (`%|@ ... %||@`)**: Areas for student code completion. Display in key files controlled by `keyDisplayMode` option.
+- **Inline Answer Blocks (`%<@ ... %>@`)**: Single expressions for student completion. Display in key files controlled by `keyDisplayMode` option.
 - **Comment Blocks (`%# ... %/#`)**: Instructor notes stripped from worksheets but preserved in keys
 
 The example shows a mathematical function evaluation task with:
@@ -44,6 +44,9 @@ LiveAssignmentBuilder('example.m', verbose=true, output="output_folder");
 
 % Use expand answer block mode (removes %@ line and all subsequent lines until stop marker)
 LiveAssignmentBuilder('example.m', answerBlockMode='expand', verbose=true);
+
+% Control how answer blocks are displayed in key files (applies to inline and multiline blocks)
+LiveAssignmentBuilder('example.m', keyDisplayMode='markup');
 ```
 
 This will generate a student worksheet (`example.mlx`) and an instructor key (`example_key.mlx`) in the specified output folder.
@@ -56,6 +59,16 @@ The `answerBlockMode` option controls how answer blocks (`%@`) are processed:
 
 - **Expand mode** (`"expand"`): The line containing `%@` and all subsequent lines until one of `%/@`, `%!`, or `%%` (two or more consecutive `%` symbols) are removed from worksheets. This is useful when you want to hide entire sections of instructor-only code.
 
+### Key Display Modes
+
+The `keyDisplayMode` option controls how answer code is displayed in key files for all answer block types (inline and multiline):
+
+- **Default mode** (`"default"`): Only shows the answer code, no comment annotation. This provides a clean key file with just the solutions.
+
+- **Markup mode** (`"markup"`): Shows the answer code on new lines above the original assignment markup (which is commented out). For multiline blocks, shows answer code followed by commented original structure. This helps instructors see both the solution and what students were asked to complete.
+
+- **Marked mode** (`"marked"`): Shows the answer code followed by a comment with the same code on the same line. This provides clear annotation showing what the answer is.
+
 ## Parsing Syntax Reference
 
 | Syntax | Purpose | Student View | Instructor View |
@@ -63,8 +76,8 @@ The `answerBlockMode` option controls how answer blocks (`%@`) are processed:
 | `%!` | Sticky block | Protected code | Same |
 | `%@` | Answer block (default mode) | Next statement removed | Full statement visible |
 | `%@` ... `%/@` | Answer block (expand mode) | All lines removed | All lines visible |
-| <code>%&#124;@ ... %&#124;&#124;@</code> | Multiline answers | Answer area | Complete solution |
-| `%<@ ... %>@` | Inline answers | Placeholder | Actual answer |
+| <code>%&#124;@ ... %&#124;&#124;@</code> | Multiline answers | Answer area | Complete solution (format controlled by `keyDisplayMode`) |
+| `%<@ ... %>@` | Inline answers | Placeholder | Actual answer (format controlled by `keyDisplayMode`) |
 | `%# ... %/#` | Comment block | Stripped content | Regular comments |
 
 ## Customization

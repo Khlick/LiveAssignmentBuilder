@@ -47,6 +47,17 @@ classdef LiveAssignmentBuilder
 %                                                  (two or more consecutive % symbols) are
 %                                                  marked for removal.
 %
+%       'keyDisplayMode' (default: "default")  : Controls how answer code is displayed in key
+%                                                files for inline answer blocks (%<@ ... %>@).
+%                                                Options:
+%                                                - "default": Only shows the answer code, no
+%                                                  comment annotation.
+%                                                - "markup": Shows the answer code on new lines
+%                                                  above the original assignment markup (which
+%                                                  is commented out).
+%                                                - "marked": Shows the answer code followed by
+%                                                  a comment with the same code on the same line.
+%
 %   Example:
 %   --------
 %   % Convert specific .m files into live scripts with default settings:
@@ -76,7 +87,7 @@ classdef LiveAssignmentBuilder
 %%%
 %   See also: matlab.internal.liveeditor.openAndSave, dir, mkdir, copyfile.
 %
-%   Version: 0.2.0
+%   Version: 0.3.0
 %   Author: Khris Griffis, Ph.D.
 %   Year: 2026
 %   License: MIT
@@ -84,7 +95,7 @@ classdef LiveAssignmentBuilder
 
   properties (Constant)
     % Version information
-    Version = "0.2.0"
+    Version = "0.3.0"
     Author = "Khris Griffis, Ph.D."
     Year = 2024
     License = "MIT"
@@ -100,7 +111,9 @@ classdef LiveAssignmentBuilder
     buildContents (1,1) logical
     executeKey (1,1) logical
     answerBlockMode (1,1) string {mustBeMember(answerBlockMode, ["default", "expand"])} = "default"
+    keyDisplayMode (1,1) string {mustBeMember(keyDisplayMode, ["default", "markup", "marked"])} = "default"
     indentChar (1,:) char = " "
+    multilineAnswerSections (:,1) struct % Stores multiline answer sections for keyDisplayMode formatting
   end
 
   methods (Static)
@@ -281,6 +294,17 @@ classdef LiveAssignmentBuilder
       %                                                  (two or more consecutive % symbols) are
       %                                                  marked for removal.
       %
+      %       'keyDisplayMode' (default: "default")  : Controls how answer code is displayed in key
+      %                                                files for inline answer blocks (%<@ ... %>@).
+      %                                                Options:
+      %                                                - "default": Only shows the answer code, no
+      %                                                  comment annotation.
+      %                                                - "markup": Shows the answer code on new lines
+      %                                                  above the original assignment markup (which
+      %                                                  is commented out).
+      %                                                - "marked": Shows the answer code followed by
+      %                                                  a comment with the same code on the same line.
+      %
       %   Example:
       %   --------
       %   % Convert specific .m files into live scripts with default settings:
@@ -307,6 +331,7 @@ classdef LiveAssignmentBuilder
         opts.buildContents (1,1) logical= false
         opts.executeKey (1,1) logical = false
         opts.answerBlockMode (1,1) string {mustBeMember(opts.answerBlockMode, ["default", "expand"])} = "default"
+        opts.keyDisplayMode (1,1) string {mustBeMember(opts.keyDisplayMode, ["default", "markup", "marked"])} = "default"
       end
 
       import matlab.internal.liveeditor.LiveEditorUtilities;
@@ -320,6 +345,8 @@ classdef LiveAssignmentBuilder
       obj.buildContents= opts.buildContents;
       obj.executeKey   = opts.executeKey;
       obj.answerBlockMode = opts.answerBlockMode;
+      obj.keyDisplayMode = opts.keyDisplayMode;
+      obj.keyDisplayMode = opts.keyDisplayMode;
 
       % Use obj properties from here on
       if isempty(obj.root) || obj.root == ""
@@ -696,6 +723,11 @@ classdef LiveAssignmentBuilder
         end
       end
       
+      % Apply keyDisplayMode formatting to multiline answer blocks in key
+      if obj.keyDisplayMode ~= "default" && ~isempty(obj.multilineAnswerSections)
+        parsedCode.key = obj.applyKeyDisplayModeToMultiline(parsedCode.key);
+      end
+      
       % drop answers private info from the worksheet
       parsedCode.work(cat(1,answerIndices(:),mlAnswerIndices(:),commentIndices(:))) = [];
 
@@ -1045,6 +1077,9 @@ classdef LiveAssignmentBuilder
       
       % Filter out blocks where the line starts with a comment character
       blockInfo = obj.filterCommentLineBlocks(stringCode, blockInfo, '%|@');
+      
+      % Initialize storage for multiline answer sections (for keyDisplayMode)
+      obj.multilineAnswerSections = struct('startRow', {}, 'endRow', {}, 'indent', {}, 'originalLines', {});
             
       mlAnswerIndices = [];
 
@@ -1119,8 +1154,23 @@ classdef LiveAssignmentBuilder
           stringCode(endTarget) = "% --- Answer End ---|^^n" + ...
            repmat(obj.indentChar, 1, endIndent) + stringCode(endTarget);
         end
+        
+        % Store answer section info for keyDisplayMode formatting
+        answerStart = startRow + 1;
+        answerEnd = endTarget - 1;
+        if answerStart <= answerEnd
+          % Get original lines (before marker replacement) for markup mode
+          originalAnswerLines = stringCode(answerStart:answerEnd);
+          obj.multilineAnswerSections(end+1) = struct( ...
+            'startRow', answerStart, ...
+            'endRow', answerEnd, ...
+            'indent', startIndent, ...
+            'originalLines', originalAnswerLines ...
+          );
+        end
+        
         % Update the multiline answer indices
-        mlAnswerIndices = [mlAnswerIndices, (startRow+1):(endTarget-1)];        
+        mlAnswerIndices = [mlAnswerIndices, answerStart:answerEnd];        
       end
       mlAnswerIndices = unique(mlAnswerIndices);
     end
@@ -1176,7 +1226,30 @@ classdef LiveAssignmentBuilder
             'once' ...
           );
           if outputType == "key"
-            stringCode(startRow) = regexprep(charLine, matchPattern, string(codeMatch)) + "%<- " + string(codeMatch) + " ->%";
+            % Handle different key display modes
+            answerCode = string(codeMatch);
+            
+            if obj.keyDisplayMode == "default"
+              % Only show the key code, no comment
+              stringCode(startRow) = regexprep(charLine, matchPattern, answerCode);
+            elseif obj.keyDisplayMode == "markup"
+              % Show original assignment markup (commented) plus answer on new lines above
+              % Find indentation of the original line
+              indentMatch = regexp(charLine, '^(\s*)', 'tokens', 'once');
+              indentStr = "";
+              if ~isempty(indentMatch)
+                indentStr = indentMatch{1};
+              end
+              % Get the original line with placeholder (what students see)
+              originalWithPlaceholder = regexprep(charLine, matchPattern, '"%--- ANSWER HERE ---%"');
+              % Comment out the original line (preserve structure but comment it)
+              commentedOriginal = indentStr + "% " + strtrim(originalWithPlaceholder);
+              % Add answer code on new line above the commented original
+              stringCode(startRow) = indentStr + answerCode + "^^n" + commentedOriginal;
+            else % "marked"
+              % Current behavior: code + comment on same line
+              stringCode(startRow) = regexprep(charLine, matchPattern, answerCode) + "%<- " + answerCode + " ->%";
+            end
           else
             stringCode(startRow) = regexprep(charLine, matchPattern, '"%--- ANSWER HERE ---%"');
           end
@@ -1189,6 +1262,57 @@ classdef LiveAssignmentBuilder
             "MultilineInlineBlocksNotImplemented" ...
           );
           throw(exc);
+        end
+      end
+    end
+
+    function keyCode = applyKeyDisplayModeToMultiline(obj, keyCode)
+      % APPLYKEYDISPLAYMODETOMULTILINE Apply keyDisplayMode formatting to multiline answer blocks
+      %
+      %   Formats answer code in multiline blocks according to keyDisplayMode setting.
+      %
+      % Inputs:
+      %   keyCode - Array of strings containing the key code
+      %
+      % Outputs:
+      %   keyCode - Modified key code with formatting applied
+      
+      if isempty(obj.multilineAnswerSections)
+        return;
+      end
+      
+      % Process sections in reverse order to maintain line indices
+      for sIdx = numel(obj.multilineAnswerSections):-1:1
+        section = obj.multilineAnswerSections(sIdx);
+        startRow = section.startRow;
+        endRow = section.endRow;
+        indent = section.indent;
+        originalLines = section.originalLines;
+        
+        if startRow > numel(keyCode) || endRow > numel(keyCode)
+          continue; % Section out of bounds
+        end
+        
+        indentStr = repmat(obj.indentChar, 1, indent);
+        answerLines = keyCode(startRow:endRow);
+        
+        if obj.keyDisplayMode == "markup"
+          % Show answer code, then commented original structure
+          % Build commented version of original lines
+          commentedLines = arrayfun(@(line) indentStr + "% " + strtrim(line), originalLines, 'UniformOutput', false);
+          commentedLines = string(commentedLines);
+          % Combine: answer code + commented original
+          formattedSection = [answerLines; commentedLines];
+          % Replace the section
+          keyCode = [keyCode(1:startRow-1); formattedSection; keyCode(endRow+1:end)];
+        elseif obj.keyDisplayMode == "marked"
+          % Add comment annotation to each answer line
+          formattedLines = arrayfun(@(line, origLine) ...
+            line + "%<- " + strtrim(origLine) + " ->%", ...
+            answerLines, originalLines, 'UniformOutput', false);
+          formattedLines = string(formattedLines);
+          % Replace the section
+          keyCode = [keyCode(1:startRow-1); formattedLines; keyCode(endRow+1:end)];
         end
       end
     end
